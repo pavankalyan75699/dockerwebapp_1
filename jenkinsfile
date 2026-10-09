@@ -1,0 +1,103 @@
+
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven3'
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        SONAR_PROJECT_KEY = 'java-webapp'
+        TOMCAT_URL = 'http://YOUR-TOMCAT-HOST:8080'
+        APP_NAME = 'java-webapp'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git log -1 --oneline'
+            }
+        }
+
+        stage('Build and Test') {
+            steps {
+                sh 'mvn clean verify'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        mvn sonar:sonar \
+                          -Dsonar.projectKey=$SONAR_PROJECT_KEY
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Publish to Nexus') {
+            steps {
+                sh 'mvn deploy -DskipTests'
+            }
+        }
+
+        stage('Deploy to Tomcat') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'tomcat-credentials',
+                        usernameVariable: 'TOMCAT_USER',
+                        passwordVariable: 'TOMCAT_PASS'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        WAR_FILE=$(find target \
+                          -maxdepth 1 -type f \
+                          -name '*.war' -print -quit)
+
+                        test -n "$WAR_FILE"
+
+                        curl --fail --silent --show-error \
+                          --user "$TOMCAT_USER:$TOMCAT_PASS" \
+                          --upload-file "$WAR_FILE" \
+                          "$TOMCAT_URL/manager/text/deploy?path=/$APP_NAME&update=true"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI/CD pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the failed stage and console log.'
+        }
+
+        always {
+            archiveArtifacts(
+                artifacts: 'target/*.war',
+                allowEmptyArchive: true
+            )
+        }
+    }
+}
