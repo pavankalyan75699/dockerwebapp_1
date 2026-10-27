@@ -90,5 +90,13 @@
 <!-- /container -->
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
 <script src="${contextPath}/resources/js/bootstrap.min.js"></script>
+<footer style="text-align: center; padding: 20px 10px; margin-top: 30px;">
+    <p style="font-weight: bold; font-size: 18px; margin-bottom: 5px;">
+        GINNI PAVAN KALYAN
+    </p>
+    <p style="font-weight: bold; font-size: 14px; margin-bottom: 0;">
+        Done by Pavan Kalyan
+    </p>
+</footer>
 </body>
 </html>
